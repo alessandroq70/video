@@ -1,100 +1,64 @@
 # 🎬 Unisci Video
 
-App web semplice per **unire due o più file video** in un unico documento MP4.
-Selezioni i video, li ordini come vuoi, e al salvataggio l'app ti **chiede dove
-salvare** il risultato.
+App web per **unire due o più file video** in un unico MP4, **direttamente nel
+browser**. Nessuna installazione, nessun server: i video vengono elaborati sul
+tuo dispositivo grazie a **[ffmpeg.wasm](https://ffmpegwasm.netlify.app/)**.
 
-Usa **FFmpeg** dietro le quinte, incluso automaticamente tramite il pacchetto
-`imageio-ffmpeg`: **non devi installare FFmpeg a mano**.
+> 🔒 **Privacy:** i video **non vengono mai caricati online** — restano sul tuo
+> dispositivo e l'elaborazione avviene interamente nel browser.
 
 ## Caratteristiche
 
 - Selezione di **2 o più video** (clic o trascinamento).
-- **Riordino** dei file prima dell'unione (frecce su/giù).
-- Rimozione dei singoli file e pulsante per svuotare l'elenco.
+- **Riordino** dei file prima dell'unione (frecce su/giù) e rimozione singola.
+- **Copertina** opzionale: un'immagine mostrata per N secondi all'inizio del
+  video finale.
 - **Unione intelligente:**
   - se i video hanno **stesso formato/risoluzione** vengono uniti senza
-    riconversione (veloce e senza perdita di qualità — ideale per unire spezzoni
-    dello stesso filmato);
+    riconversione (veloce e senza perdita di qualità);
   - se hanno **formati o risoluzioni diversi**, vengono riconvertiti in un MP4
     standard (H.264/AAC), adattando le dimensioni a un formato comune e
     aggiungendo una traccia audio silenziosa dove manca.
-- **Barra di avanzamento** in tempo reale durante la riconversione, così sai
-  sempre a che punto è l'unione (l'elaborazione avviene in background).
-- Al salvataggio apre un vero dialogo **"Salva con nome"** su Chrome ed Edge
-  (i browser predefiniti su Windows). Sugli altri browser il file viene
-  scaricato nella cartella Download.
-
-## Requisiti
-
-- [Python 3.9+](https://www.python.org/downloads/) installato
-  (durante l'installazione su Windows spunta *"Add Python to PATH"*).
-
-## Avvio rapido (Windows)
-
-1. Scarica/clona questa cartella.
-2. Fai **doppio clic su `run.bat`**.
-   - Al primo avvio crea l'ambiente e scarica le dipendenze, **incluso FFmpeg**
-     (ci vuole un minuto).
-   - Si apre automaticamente il browser su <http://127.0.0.1:5000>.
-3. Per chiudere l'app, premi `CTRL+C` nella finestra del terminale.
-
-## Avvio manuale (qualsiasi sistema)
-
-```bash
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# macOS / Linux:
-source .venv/bin/activate
-
-pip install -r requirements.txt
-python app.py
-```
-
-Poi apri <http://127.0.0.1:5000> nel browser.
+- **Barra di avanzamento** durante l'elaborazione.
+- Salvataggio del risultato con dialogo **"Salva con nome"** su Chrome/Edge
+  (sugli altri browser il file viene scaricato nella cartella Download).
 
 ## Come si usa
 
+L'app è un **unico file HTML** (`docs/index.html`): non serve installare nulla.
+
+### Opzione 1 — Apri il file in locale
+Fai doppio clic su `docs/index.html` (o aprilo dal browser). Serve una
+connessione a internet **solo al primo utilizzo**, per scaricare il motore
+ffmpeg.wasm.
+
+### Opzione 2 — Pubblicala online gratis (GitHub Pages)
+1. Vai in **Settings → Pages** del repository.
+2. In *Build and deployment*, scegli **Deploy from a branch**.
+3. Seleziona il branch `main` e la cartella **`/docs`**, poi salva.
+4. Dopo qualche istante l'app sarà raggiungibile all'URL indicato da GitHub.
+
+Poi:
 1. Clicca sull'area tratteggiata (o trascina i video) per aggiungere i file.
-2. Riordina i file con le frecce ▲ ▼ se necessario.
+2. Riordina i file con le frecce ▲ ▼ se necessario; aggiungi una copertina se
+   vuoi.
 3. Clicca **"Unisci e salva"** e scegli dove salvare il video unito.
 
-> ⏳ Se i video hanno formati diversi serve una riconversione: per file lunghi o
-> in alta risoluzione può richiedere qualche minuto. Non chiudere la pagina nel
-> frattempo.
+## Note e limiti
+
+- L'elaborazione avviene **nel browser**: è adatta a video **piccoli/brevi**.
+  File molto grandi o lunghi possono essere lenti o esaurire la memoria della
+  scheda del browser.
+- Formati supportati in ingresso: i più comuni (MP4, MOV, MKV, WEBM, AVI, …).
+  L'uscita è sempre MP4.
+- Consigliati i browser basati su Chromium (Chrome, Edge) per il dialogo di
+  salvataggio "Salva con nome".
 
 ## Struttura del progetto
 
 ```
 .
-├── app.py              # Server web Flask (route / e /merge)
-├── video_merger.py     # Logica di unione video con FFmpeg (testabile)
-├── templates/
-│   └── index.html      # Interfaccia
-├── static/
-│   ├── app.js          # Logica lato browser (selezione, ordine, salvataggio)
-│   └── style.css       # Stile
-├── tests/
-│   └── test_merge.py   # Test della logica di unione
-├── requirements.txt    # Dipendenze Python
-└── run.bat             # Avvio rapido su Windows
+├── docs/
+│   └── index.html   # L'intera app (HTML + CSS + JS) in un unico file
+└── README.md
 ```
-
-## Test
-
-```bash
-pip install pytest
-pytest
-```
-
-## Note
-
-- I video vengono elaborati **in locale**, sul tuo computer: nulla viene
-  inviato a internet.
-- Le informazioni sui video vengono lette con **`ffprobe`** se è disponibile sul
-  sistema (dati più affidabili); in caso contrario si usa un'analisi di riserva
-  basata su `ffmpeg`, quindi **non serve installare nulla in più**.
-- Limite di caricamento predefinito: 4 GB totali (modificabile in `app.py`).
-- Formati supportati in ingresso: MP4, MOV, M4V, AVI, MKV, WEBM, WMV, FLV,
-  MPEG, 3GP. L'uscita è sempre MP4.

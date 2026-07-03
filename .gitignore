@@ -1,14 +1,5 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.pytest_cache/
-
-# Virtual environments
-.venv/
-venv/
-env/
-
 # OS / editor
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/
