@@ -70,3 +70,33 @@ def test_invalid_input_raises(tmp_path):
         fh.write(b"not a real video")
     with pytest.raises(MergeError):
         merge_videos([a, bad], str(tmp_path / "out.mp4"))
+
+
+def test_progress_callback_fast_path_reports_completion(tmp_path):
+    a = make_video(str(tmp_path / "a.mp4"), duration=2)
+    b = make_video(str(tmp_path / "b.mp4"), duration=2)
+    seen = []
+    merge_videos([a, b], str(tmp_path / "out.mp4"), progress_callback=seen.append)
+    # The lossless fast path is instant, but it must still report completion.
+    assert seen and seen[-1] == 1.0
+
+
+def test_progress_callback_reencode_reports_monotonic_progress(tmp_path):
+    a = make_video(str(tmp_path / "a.mp4"), size="640x480", rate=25, duration=4)
+    b = make_video(str(tmp_path / "b.mp4"), size="320x240", rate=30, duration=3)
+    seen = []
+    merge_videos([a, b], str(tmp_path / "out.mp4"), progress_callback=seen.append)
+
+    assert seen, "expected the re-encode to report progress"
+    assert all(0.0 <= f <= 1.0 for f in seen)
+    assert seen == sorted(seen), "progress should never go backwards"
+    assert seen[-1] == 1.0
+
+
+def test_probe_reads_stream_info(tmp_path):
+    a = make_video(str(tmp_path / "a.mp4"), size="640x480", rate=30, duration=2)
+    info = _probe(a)
+    assert info.width == 640 and info.height == 480
+    assert abs(info.fps - 30) < 1.0
+    assert 1.8 < info.duration < 2.4
+    assert info.has_audio
