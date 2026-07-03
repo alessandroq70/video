@@ -19,6 +19,8 @@ Usa **FFmpeg** dietro le quinte, incluso automaticamente tramite il pacchetto
   - se hanno **formati o risoluzioni diversi**, vengono riconvertiti in un MP4
     standard (H.264/AAC), adattando le dimensioni a un formato comune e
     aggiungendo una traccia audio silenziosa dove manca.
+- **Barra di avanzamento** in tempo reale durante la riconversione, così sai
+  sempre a che punto è l'unione (l'elaborazione avviene in background).
 - Al salvataggio apre un vero dialogo **"Salva con nome"** su Chrome ed Edge
   (i browser predefiniti su Windows). Sugli altri browser il file viene
   scaricato nella cartella Download.
@@ -90,6 +92,9 @@ pytest
 
 - I video vengono elaborati **in locale**, sul tuo computer: nulla viene
   inviato a internet.
+- Le informazioni sui video vengono lette con **`ffprobe`** se è disponibile sul
+  sistema (dati più affidabili); in caso contrario si usa un'analisi di riserva
+  basata su `ffmpeg`, quindi **non serve installare nulla in più**.
 - Limite di caricamento predefinito: 4 GB totali (modificabile in `app.py`).
 - Formati supportati in ingresso: MP4, MOV, M4V, AVI, MKV, WEBM, WMV, FLV,
   MPEG, 3GP. L'uscita è sempre MP4.
