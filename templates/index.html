@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Unisci Video</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <main class="card">
+    <h1>🎬 Unisci Video</h1>
+    <p class="subtitle">Seleziona 2 o più video, mettili nell'ordine desiderato e uniscili in un unico file MP4.</p>
+
+    <label for="file-input" class="dropzone" id="dropzone">
+      <span class="dropzone-icon">⬆️</span>
+      <span class="dropzone-text">Clicca per scegliere i video<br /><small>oppure trascinali qui</small></span>
+      <input type="file" id="file-input" accept="video/*" multiple hidden />
+    </label>
+
+    <ul id="file-list" class="file-list" aria-live="polite"></ul>
+
+    <div class="actions">
+      <button type="button" id="clear-btn" class="btn btn-secondary" disabled>Svuota</button>
+      <button type="button" id="merge-btn" class="btn btn-primary" disabled>Unisci e salva</button>
+    </div>
+
+    <p id="status" class="status" role="status"></p>
+    <p class="hint">Suggerimento: unire video di formati diversi richiede una riconversione e può impiegare qualche minuto.</p>
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
