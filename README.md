@@ -10,7 +10,9 @@ tuo dispositivo grazie a **[ffmpeg.wasm](https://ffmpegwasm.netlify.app/)**.
 ## Caratteristiche
 
 - Selezione di **2 o più video** (clic o trascinamento).
-- **Riordino** dei file prima dell'unione (frecce su/giù) e rimozione singola.
+- **Miniature e durata** di ogni clip, con totale complessivo dell'elenco.
+- **Riordino** dei file prima dell'unione: **trascinali** nella posizione
+  desiderata oppure usa le frecce su/giù; rimozione singola o svuota tutto.
 - **Copertina** opzionale: un'immagine mostrata per N secondi all'inizio del
   video finale.
 - **Unione intelligente:**
@@ -19,9 +21,13 @@ tuo dispositivo grazie a **[ffmpeg.wasm](https://ffmpegwasm.netlify.app/)**.
   - se hanno **formati o risoluzioni diversi**, vengono riconvertiti in un MP4
     standard (H.264/AAC), adattando le dimensioni a un formato comune e
     aggiungendo una traccia audio silenziosa dove manca.
-- **Barra di avanzamento** durante l'elaborazione.
-- Salvataggio del risultato con dialogo **"Salva con nome"** su Chrome/Edge
-  (sugli altri browser il file viene scaricato nella cartella Download).
+- **Barra di avanzamento** con percentuale durante l'elaborazione.
+- **Anteprima del risultato** direttamente nella pagina: guarda il video unito
+  prima di decidere se salvarlo o scartarlo.
+- **Nome del file personalizzabile** al salvataggio, con dialogo
+  **"Salva con nome"** su Chrome/Edge (sugli altri browser il file viene
+  scaricato nella cartella Download).
+- **Tema chiaro/scuro** automatico in base alle preferenze di sistema.
 
 ## Come si usa
 
@@ -40,9 +46,10 @@ ffmpeg.wasm.
 
 Poi:
 1. Clicca sull'area tratteggiata (o trascina i video) per aggiungere i file.
-2. Riordina i file con le frecce ▲ ▼ se necessario; aggiungi una copertina se
-   vuoi.
-3. Clicca **"Unisci e salva"** e scegli dove salvare il video unito.
+2. Riordina i file trascinandoli (o con le frecce ▲ ▼); aggiungi una copertina
+   se vuoi.
+3. Clicca **"Unisci"**, guarda l'anteprima del risultato, scegli il nome del
+   file e premi **"Salva"**.
 
 ## Note e limiti
 

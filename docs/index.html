@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark" />
   <title>Unisci Video (online)</title>
   <style>
 :root {
@@ -15,6 +16,27 @@
   --border: #d1d5db;
   --danger: #dc2626;
   --success: #16a34a;
+  --item-bg: #fafafa;
+  --hover-bg: #f5f3ff;
+  --control-bg: #e5e7eb;
+  --control-hover: #d1d5db;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111827;
+    --card-bg: #1f2937;
+    --text: #f9fafb;
+    --muted: #9ca3af;
+    --border: #4b5563;
+    --danger: #f87171;
+    --success: #4ade80;
+    --item-bg: #111827;
+    --hover-bg: #312e81;
+    --control-bg: #374151;
+    --control-hover: #4b5563;
+  }
+  .card { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); }
 }
 
 * { box-sizing: border-box; }
@@ -65,7 +87,7 @@ h1 { margin: 0 0 4px; font-size: 1.6rem; }
 .dropzone:hover,
 .dropzone.dragover {
   border-color: var(--primary);
-  background: #f5f3ff;
+  background: var(--hover-bg);
 }
 
 .dropzone-icon { font-size: 2rem; }
@@ -77,12 +99,16 @@ h1 { margin: 0 0 4px; font-size: 1.6rem; }
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
   margin-bottom: 8px;
-  background: #fafafa;
+  background: var(--item-bg);
+  cursor: grab;
 }
+
+.file-item.dragging { opacity: 0.45; }
+.file-item.drop-target { border-color: var(--primary); }
 
 .file-index {
   flex: 0 0 auto;
@@ -97,8 +123,36 @@ h1 { margin: 0 0 4px; font-size: 1.6rem; }
   justify-content: center;
 }
 
-.file-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.file-size { flex: 0 0 auto; color: var(--muted); font-size: 0.82rem; }
+.file-thumb {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 34px;
+  border-radius: 6px;
+  background: var(--control-bg);
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  overflow: hidden;
+}
+
+.file-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.92rem;
+}
+
+.file-meta { color: var(--muted); font-size: 0.78rem; }
 
 .icon-btn {
   flex: 0 0 auto;
@@ -111,13 +165,27 @@ h1 { margin: 0 0 4px; font-size: 1.6rem; }
   color: var(--muted);
 }
 
-.icon-btn:hover:not(:disabled) { background: #e5e7eb; color: var(--text); }
+.icon-btn:hover:not(:disabled) { background: var(--control-bg); color: var(--text); }
 .icon-btn:disabled { opacity: 0.3; cursor: default; }
 
-.progress-wrap {
+.summary {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-top: 18px;
+}
+
+.progress-track {
+  flex: 1 1 auto;
   height: 8px;
-  background: #e5e7eb;
+  background: var(--control-bg);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -127,6 +195,15 @@ h1 { margin: 0 0 4px; font-size: 1.6rem; }
   width: 0%;
   background: var(--primary);
   transition: width 0.2s ease;
+}
+
+.progress-label {
+  flex: 0 0 auto;
+  min-width: 3em;
+  text-align: right;
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .actions { display: flex; gap: 12px; margin-top: 24px; }
@@ -147,8 +224,8 @@ h1 { margin: 0 0 4px; font-size: 1.6rem; }
 .btn-primary { background: var(--primary); color: #fff; }
 .btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
 
-.btn-secondary { background: #e5e7eb; color: var(--text); }
-.btn-secondary:hover:not(:disabled) { background: #d1d5db; }
+.btn-secondary { background: var(--control-bg); color: var(--text); }
+.btn-secondary:hover:not(:disabled) { background: var(--control-hover); }
 
 .status {
   margin: 16px 0 0;
@@ -208,7 +285,41 @@ h1 { margin: 0 0 4px; font-size: 1.6rem; }
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 0.9rem;
+  background: var(--card-bg);
+  color: var(--text);
 }
+
+.preview { margin-top: 20px; }
+
+.preview video {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  border-radius: 12px;
+  background: #000;
+}
+
+.preview-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.preview-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  background: var(--card-bg);
+  color: var(--text);
+}
+
+.out-ext { flex: 0 0 auto; color: var(--muted); }
+
+.preview .actions { margin-top: 12px; }
 
   </style>
   <!-- ffmpeg.wasm (single-thread core: nessun header speciale richiesto) -->
@@ -227,6 +338,7 @@ h1 { margin: 0 0 4px; font-size: 1.6rem; }
     </label>
 
     <ul id="file-list" class="file-list" aria-live="polite"></ul>
+    <p id="summary" class="summary" hidden></p>
 
     <div class="cover-row">
       <input type="file" id="cover-input" accept="image/*" hidden />
@@ -236,13 +348,26 @@ h1 { margin: 0 0 4px; font-size: 1.6rem; }
       <label class="dur-label">Durata <input type="number" id="cover-dur" value="3" min="1" max="60" step="1" /> s</label>
     </div>
 
-    <div class="progress-wrap" id="progress-wrap" hidden>
-      <div class="progress-bar" id="progress-bar"></div>
+    <div class="progress-row" id="progress-wrap" hidden>
+      <div class="progress-track"><div class="progress-bar" id="progress-bar"></div></div>
+      <span id="progress-label" class="progress-label"></span>
     </div>
 
     <div class="actions">
       <button type="button" id="clear-btn" class="btn btn-secondary" disabled>Svuota</button>
-      <button type="button" id="merge-btn" class="btn btn-primary" disabled>Unisci e salva</button>
+      <button type="button" id="merge-btn" class="btn btn-primary" disabled>Unisci</button>
+    </div>
+
+    <div id="preview" class="preview" hidden>
+      <video id="preview-video" controls playsinline></video>
+      <div class="preview-row">
+        <input type="text" id="out-name" value="video-unito" aria-label="Nome del file" />
+        <span class="out-ext">.mp4</span>
+      </div>
+      <div class="actions">
+        <button type="button" id="discard-btn" class="btn btn-secondary">✕ Scarta</button>
+        <button type="button" id="save-btn" class="btn btn-primary">💾 Salva</button>
+      </div>
     </div>
 
     <p id="status" class="status" role="status"></p>
@@ -271,24 +396,35 @@ const WORKER_URL = `${FFMPEG_BASE}/814.ffmpeg.js`;
 
 const VIDEO_EXT = /\.(mp4|mov|m4v|avi|mkv|webm|wmv|flv|mpe?g|3gp)$/i;
 
-let files = [];        // videos in merge order
+let items = [];         // { file, thumb, duration } in merge order
 let cover = null;       // optional cover image File shown at the start
-let ffmpeg = null;     // lazily created FFmpeg instance
+let ffmpeg = null;      // lazily created FFmpeg instance
 let logBuffer = [];     // captured ffmpeg log lines for the current command
+let progressActive = false; // only track ffmpeg progress during the real merge
+let resultBlob = null;  // finished video waiting in the preview
+let resultUrl = null;   // object URL backing the preview player
+let dragIndex = null;   // index being dragged for list reordering
 
 const fileInput = document.getElementById("file-input");
 const dropzone = document.getElementById("dropzone");
 const fileListEl = document.getElementById("file-list");
+const summaryEl = document.getElementById("summary");
 const mergeBtn = document.getElementById("merge-btn");
 const clearBtn = document.getElementById("clear-btn");
 const statusEl = document.getElementById("status");
 const progressWrap = document.getElementById("progress-wrap");
 const progressBar = document.getElementById("progress-bar");
+const progressLabel = document.getElementById("progress-label");
 const coverInput = document.getElementById("cover-input");
 const coverBtn = document.getElementById("cover-btn");
 const coverNameEl = document.getElementById("cover-name");
 const coverRemoveBtn = document.getElementById("cover-remove");
 const coverDurInput = document.getElementById("cover-dur");
+const previewEl = document.getElementById("preview");
+const previewVideo = document.getElementById("preview-video");
+const outNameInput = document.getElementById("out-name");
+const saveBtn = document.getElementById("save-btn");
+const discardBtn = document.getElementById("discard-btn");
 
 // --- Helpers ---------------------------------------------------------------
 
@@ -297,6 +433,16 @@ function formatSize(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+function formatDuration(seconds) {
+  if (!isFinite(seconds) || seconds <= 0) return "";
+  const s = Math.round(seconds);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+  return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
 function setStatus(message, kind) {
@@ -308,11 +454,13 @@ function setProgress(fraction) {
   if (fraction == null) {
     progressWrap.hidden = true;
     progressBar.style.width = "0%";
+    progressLabel.textContent = "";
     return;
   }
   progressWrap.hidden = false;
   const pct = Math.max(0, Math.min(100, Math.round(fraction * 100)));
   progressBar.style.width = pct + "%";
+  progressLabel.textContent = pct + "%";
 }
 
 function isVideo(file) {
@@ -328,6 +476,11 @@ function even(n) {
   return n % 2 === 0 ? n : n + 1;
 }
 
+function sanitizeName(name) {
+  const cleaned = (name || "").replace(/[\\/:*?"<>|]/g, "").trim().replace(/\.mp4$/i, "");
+  return cleaned || "video-unito";
+}
+
 // --- File list management --------------------------------------------------
 
 function addFiles(fileListLike) {
@@ -335,45 +488,145 @@ function addFiles(fileListLike) {
   let skipped = 0;
   for (const file of incoming) {
     if (!isVideo(file)) { skipped++; continue; }
-    const duplicate = files.some((f) => f.name === file.name && f.size === file.size);
-    if (!duplicate) files.push(file);
+    const duplicate = items.some((it) => it.file.name === file.name && it.file.size === file.size);
+    if (duplicate) continue;
+    const item = { file, thumb: null, duration: null };
+    items.push(item);
+    loadMeta(item);
   }
   render();
   setStatus(skipped > 0 ? `${skipped} file ignorato/i perché non è un video.` : "", skipped > 0 ? "error" : "");
 }
 
-function removeAt(index) { files.splice(index, 1); render(); }
+// Read duration and grab a small thumbnail frame using an off-DOM <video>.
+// Best-effort: codecs the browser can't decode simply keep the placeholder.
+function loadMeta(item) {
+  const url = URL.createObjectURL(item.file);
+  const video = document.createElement("video");
+  video.preload = "metadata";
+  video.muted = true;
+  video.playsInline = true;
+  let finished = false;
+  const done = () => {
+    if (finished) return;
+    finished = true;
+    URL.revokeObjectURL(url);
+    video.removeAttribute("src");
+    try { video.load(); } catch (_) {}
+    render();
+  };
+  video.addEventListener("loadedmetadata", () => {
+    if (isFinite(video.duration)) item.duration = video.duration;
+    try {
+      video.currentTime = Math.min(1, (video.duration || 0) / 2);
+    } catch (_) { done(); }
+  });
+  video.addEventListener("seeked", () => {
+    try {
+      const w = 112;
+      const ratio = video.videoWidth ? video.videoHeight / video.videoWidth : 9 / 16;
+      const h = Math.max(2, Math.round(w * ratio));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d").drawImage(video, 0, 0, w, h);
+      item.thumb = canvas.toDataURL("image/jpeg", 0.7);
+    } catch (_) {}
+    done();
+  });
+  video.addEventListener("error", done);
+  video.src = url;
+}
+
+function removeAt(index) { items.splice(index, 1); render(); }
 
 function move(index, delta) {
   const target = index + delta;
-  if (target < 0 || target >= files.length) return;
-  [files[index], files[target]] = [files[target], files[index]];
+  if (target < 0 || target >= items.length) return;
+  [items[index], items[target]] = [items[target], items[index]];
   render();
 }
 
 function render() {
   fileListEl.innerHTML = "";
-  files.forEach((file, i) => {
+  items.forEach((item, i) => {
     const li = document.createElement("li");
     li.className = "file-item";
+    li.draggable = true;
     li.innerHTML = `
       <span class="file-index">${i + 1}</span>
-      <span class="file-name" title="${file.name}">${file.name}</span>
-      <span class="file-size">${formatSize(file.size)}</span>
+      ${item.thumb
+        ? `<img class="file-thumb" alt="" src="${item.thumb}" />`
+        : `<span class="file-thumb">🎞️</span>`}
+      <span class="file-info">
+        <span class="file-name"></span>
+        <span class="file-meta"></span>
+      </span>
       <button class="icon-btn" data-act="up" ${i === 0 ? "disabled" : ""} title="Sposta su">▲</button>
-      <button class="icon-btn" data-act="down" ${i === files.length - 1 ? "disabled" : ""} title="Sposta giù">▼</button>
+      <button class="icon-btn" data-act="down" ${i === items.length - 1 ? "disabled" : ""} title="Sposta giù">▼</button>
       <button class="icon-btn" data-act="remove" title="Rimuovi">✕</button>
     `;
+    const nameEl = li.querySelector(".file-name");
+    nameEl.textContent = item.file.name;
+    nameEl.title = item.file.name;
+    const dur = formatDuration(item.duration);
+    li.querySelector(".file-meta").textContent = formatSize(item.file.size) + (dur ? ` · ${dur}` : "");
     li.querySelector('[data-act="up"]').addEventListener("click", () => move(i, -1));
     li.querySelector('[data-act="down"]').addEventListener("click", () => move(i, 1));
     li.querySelector('[data-act="remove"]').addEventListener("click", () => removeAt(i));
+
+    // Drag & drop reordering (in addition to the arrows).
+    li.addEventListener("dragstart", (e) => {
+      dragIndex = i;
+      li.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", String(i)); } catch (_) {}
+    });
+    li.addEventListener("dragend", () => { dragIndex = null; render(); });
+    li.addEventListener("dragover", (e) => {
+      if (dragIndex === null) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (dragIndex !== i) li.classList.add("drop-target");
+    });
+    li.addEventListener("dragleave", () => li.classList.remove("drop-target"));
+    li.addEventListener("drop", (e) => {
+      if (dragIndex === null) return;
+      e.preventDefault();
+      if (dragIndex !== i) {
+        const [moved] = items.splice(dragIndex, 1);
+        items.splice(i, 0, moved);
+      }
+      dragIndex = null;
+      render();
+    });
+
     fileListEl.appendChild(li);
   });
-  mergeBtn.disabled = files.length < 2;
-  clearBtn.disabled = files.length === 0;
+
+  updateSummary();
+  mergeBtn.disabled = items.length < 2;
+  clearBtn.disabled = items.length === 0;
 }
 
-// --- File picking: click + drag & drop -------------------------------------
+function updateSummary() {
+  if (items.length === 0) {
+    summaryEl.hidden = true;
+    summaryEl.textContent = "";
+    return;
+  }
+  const totalBytes = items.reduce((s, it) => s + it.file.size, 0);
+  const known = items.filter((it) => isFinite(it.duration) && it.duration > 0);
+  const totalDur = known.reduce((s, it) => s + it.duration, 0);
+  let text = `${items.length} video · ${formatSize(totalBytes)}`;
+  if (known.length > 0) {
+    text += ` · ${formatDuration(totalDur)}${known.length < items.length ? "+" : ""} totali`;
+  }
+  summaryEl.textContent = text;
+  summaryEl.hidden = false;
+}
+
+// --- File picking: click + drag & drop ---------------------------------------
 
 fileInput.addEventListener("change", (e) => {
   addFiles(e.target.files);
@@ -390,7 +643,7 @@ dropzone.addEventListener("drop", (e) => {
   if (e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files);
 });
 
-clearBtn.addEventListener("click", () => { files = []; render(); setStatus(""); });
+clearBtn.addEventListener("click", () => { items = []; render(); setStatus(""); });
 
 // --- Cover image (optional intro) ------------------------------------------
 
@@ -440,6 +693,11 @@ async function ensureFFmpeg() {
   setStatus("Preparazione del motore video… (primo avvio: scarica ~30 MB)", "busy");
   const instance = new FFmpeg();
   instance.on("log", ({ message }) => { logBuffer.push(message); });
+  // Registered once here (not per merge) so listeners don't pile up. The
+  // probe execs also emit progress events, hence the progressActive gate.
+  instance.on("progress", ({ progress }) => {
+    if (progressActive && progress >= 0 && progress <= 1) setProgress(progress);
+  });
   // Tutto caricato come blob di pari-origine: da CDN un Worker cross-origin
   // verrebbe bloccato, mentre un worker-blob può importare il core-blob (ESM).
   await instance.load({
@@ -569,13 +827,34 @@ async function reencodeConcat(infos, names, out, cover) {
   }
 }
 
-// --- Save ------------------------------------------------------------------
+// --- Result preview + save ---------------------------------------------------
 
-async function saveBlob(blob) {
+function showPreview(blob) {
+  clearPreview();
+  resultBlob = blob;
+  resultUrl = URL.createObjectURL(blob);
+  previewVideo.src = resultUrl;
+  previewEl.hidden = false;
+}
+
+function clearPreview() {
+  try { previewVideo.pause(); } catch (_) {}
+  previewVideo.removeAttribute("src");
+  try { previewVideo.load(); } catch (_) {}
+  if (resultUrl) URL.revokeObjectURL(resultUrl);
+  resultBlob = null;
+  resultUrl = null;
+  previewEl.hidden = true;
+}
+
+// Saving happens on a fresh click, so showSaveFilePicker always has the user
+// activation it requires (a picker invoked after minutes of processing would
+// be rejected by the browser and silently fall back to a plain download).
+async function saveBlob(blob, filename) {
   if (typeof window.showSaveFilePicker === "function") {
     try {
       const handle = await window.showSaveFilePicker({
-        suggestedName: "video-unito.mp4",
+        suggestedName: filename,
         types: [{ description: "Video MP4", accept: { "video/mp4": [".mp4"] } }],
       });
       const writable = await handle.createWritable();
@@ -589,13 +868,24 @@ async function saveBlob(blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "video-unito.mp4";
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
   return "downloaded";
 }
+
+saveBtn.addEventListener("click", async () => {
+  if (!resultBlob) return;
+  const filename = sanitizeName(outNameInput.value) + ".mp4";
+  const result = await saveBlob(resultBlob, filename);
+  if (result === "cancelled") setStatus("Salvataggio annullato.", "");
+  else if (result === "saved") setStatus("✓ Video salvato nella posizione scelta.", "success");
+  else setStatus("✓ Video pronto: controlla la cartella Download.", "success");
+});
+
+discardBtn.addEventListener("click", () => { clearPreview(); setStatus(""); });
 
 // --- Merge orchestration ---------------------------------------------------
 
@@ -606,30 +896,27 @@ async function cleanupFS(names, extra) {
 }
 
 mergeBtn.addEventListener("click", async () => {
-  if (files.length < 2) { setStatus("Seleziona almeno 2 file video.", "error"); return; }
+  if (items.length < 2) { setStatus("Seleziona almeno 2 file video.", "error"); return; }
 
-  const totalBytes = files.reduce((s, f) => s + f.size, 0);
+  const totalBytes = items.reduce((s, it) => s + it.file.size, 0);
   if (totalBytes > 700 * 1024 * 1024) {
-    setStatus("File troppo grandi per l'elaborazione nel browser (max ~700 MB in totale). Usa la versione desktop.", "error");
+    setStatus("File troppo grandi per l'elaborazione nel browser (max ~700 MB in totale).", "error");
     return;
   }
 
+  clearPreview();
   mergeBtn.disabled = true;
   clearBtn.disabled = true;
-  const names = files.map((f, i) => `in${i}.${extOf(f.name)}`);
+  const names = items.map((it, i) => `in${i}.${extOf(it.file.name)}`);
   let coverName = null;
 
   try {
     await ensureFFmpeg();
 
-    ffmpeg.on("progress", ({ progress }) => {
-      if (progress >= 0 && progress <= 1) setProgress(progress);
-    });
-
     setStatus("Caricamento dei file…", "busy");
     setProgress(0);
-    for (let i = 0; i < files.length; i++) {
-      await ffmpeg.writeFile(names[i], await fetchFile(files[i]));
+    for (let i = 0; i < items.length; i++) {
+      await ffmpeg.writeFile(names[i], await fetchFile(items[i].file));
     }
     if (cover) {
       coverName = `cover.${extOf(cover.name)}`;
@@ -641,6 +928,7 @@ mergeBtn.addEventListener("click", async () => {
     for (const n of names) infos.push(await probe(n));
 
     setStatus("Unione in corso… può richiedere qualche minuto.", "busy");
+    progressActive = true;
     if (coverName) {
       // With a cover we always re-encode (the image must be turned into video).
       await reencodeConcat(infos, names, "out.mp4", { name: coverName, duration: coverDuration() });
@@ -648,18 +936,18 @@ mergeBtn.addEventListener("click", async () => {
       const fast = await tryFastConcat(infos, names, "out.mp4");
       if (!fast) await reencodeConcat(infos, names, "out.mp4", null);
     }
+    progressActive = false;
 
     const data = await ffmpeg.readFile("out.mp4");
     const blob = new Blob([data.buffer], { type: "video/mp4" });
 
     setProgress(null);
-    const result = await saveBlob(blob);
-    if (result === "cancelled") setStatus("Salvataggio annullato.", "");
-    else if (result === "saved") setStatus("✓ Video salvato nella posizione scelta.", "success");
-    else setStatus("✓ Video pronto: controlla la cartella Download.", "success");
+    showPreview(blob);
+    setStatus(`✓ Video pronto (${formatSize(blob.size)}): guarda l'anteprima e salva.`, "success");
 
     await cleanupFS(names, ["out.mp4", "list.txt", coverName].filter(Boolean));
   } catch (err) {
+    progressActive = false;
     console.error(err);
     setProgress(null);
     setStatus("Errore durante l'unione: " + (err && err.message ? err.message : "riprova con video più piccoli."), "error");
