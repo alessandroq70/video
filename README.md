@@ -1,8 +1,9 @@
 # 🎬 Unisci Video
 
-App web per **unire due o più file video** in un unico MP4, **direttamente nel
-browser**. Nessuna installazione, nessun server: i video vengono elaborati sul
-tuo dispositivo grazie a **[ffmpeg.wasm](https://ffmpegwasm.netlify.app/)**.
+App web per **unire due o più file video** in un unico MP4 — e per **dividere
+un video** nel punto che scegli — **direttamente nel browser**. Nessuna
+installazione, nessun server: i video vengono elaborati sul tuo dispositivo
+grazie a **[ffmpeg.wasm](https://ffmpegwasm.netlify.app/)**.
 
 > 🔒 **Privacy:** i video **non vengono mai caricati online** — restano sul tuo
 > dispositivo e l'elaborazione avviene interamente nel browser.
@@ -13,6 +14,11 @@ tuo dispositivo grazie a **[ffmpeg.wasm](https://ffmpegwasm.netlify.app/)**.
 - **Miniature e durata** di ogni clip, con totale complessivo dell'elenco.
 - **Riordino** dei file prima dell'unione: **trascinali** nella posizione
   desiderata oppure usa le frecce su/giù; rimozione singola o svuota tutto.
+- **Taglio dei video (✂️):** carica un video, premi le forbici e indica il
+  **minuto e secondo** del taglio (o metti in pausa il player nel punto giusto
+  e premi *"Usa il punto attuale"*): il video viene **diviso in due parti**.
+  Ogni parte può essere ritagliata di nuovo, riordinata, unita alle altre o
+  **salvata da sola** col pulsante 💾.
 - **Copertina** opzionale: un'immagine mostrata per N secondi all'inizio del
   video finale.
 - **Unione intelligente:**
@@ -46,10 +52,10 @@ ffmpeg.wasm.
 
 Poi:
 1. Clicca sull'area tratteggiata (o trascina i video) per aggiungere i file.
-2. Riordina i file trascinandoli (o con le frecce ▲ ▼); aggiungi una copertina
-   se vuoi.
+2. Riordina i file trascinandoli (o con le frecce ▲ ▼); taglia i video con ✂️
+   se serve; aggiungi una copertina se vuoi.
 3. Clicca **"Unisci"**, guarda l'anteprima del risultato, scegli il nome del
-   file e premi **"Salva"**.
+   file e premi **"Salva"** — oppure salva una singola parte con 💾.
 
 ## Note e limiti
 

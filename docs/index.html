@@ -41,6 +41,9 @@
 
 * { box-sizing: border-box; }
 
+/* display:flex on a class would otherwise override the hidden attribute. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -321,6 +324,87 @@ h1 { margin: 0 0 4px; font-size: 1.6rem; }
 
 .preview .actions { margin-top: 12px; }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 10;
+}
+
+.modal {
+  background: var(--card-bg);
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+}
+
+.modal h2 { margin: 0 0 6px; font-size: 1.2rem; }
+
+.cut-file-name {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal video {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  border-radius: 10px;
+  background: #000;
+}
+
+.cut-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.cut-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+
+.cut-time input {
+  width: 64px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+  text-align: center;
+  background: var(--card-bg);
+  color: var(--text);
+}
+
+.cut-use-current {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+.cut-hint {
+  margin: 10px 0 0;
+  min-height: 1.1em;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.cut-hint.error { color: var(--danger); }
+
   </style>
   <!-- ffmpeg.wasm (single-thread core: nessun header speciale richiesto) -->
   <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
@@ -329,7 +413,7 @@ h1 { margin: 0 0 4px; font-size: 1.6rem; }
 <body>
   <main class="card">
     <h1>🎬 Unisci Video</h1>
-    <p class="subtitle">Seleziona 2 o più video, mettili nell'ordine desiderato e uniscili in un unico file MP4 — tutto nel tuo browser.</p>
+    <p class="subtitle">Unisci due o più video in un unico file MP4, oppure dividi un video nel punto che scegli (✂️) e salva le singole parti (💾) — tutto nel tuo browser.</p>
 
     <label for="file-input" class="dropzone" id="dropzone">
       <span class="dropzone-icon">⬆️</span>
@@ -374,6 +458,29 @@ h1 { margin: 0 0 4px; font-size: 1.6rem; }
     <p class="hint">🔒 I video restano sul tuo dispositivo: nulla viene caricato online. Adatta a video piccoli/brevi.</p>
   </main>
 
+  <div id="cut-modal" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cut-title">
+      <h2 id="cut-title">✂️ Dividi il video</h2>
+      <p id="cut-file-name" class="cut-file-name"></p>
+      <video id="cut-video" controls playsinline></video>
+      <div class="cut-controls">
+        <span class="cut-time">
+          Taglia a
+          <input type="number" id="cut-min" min="0" value="0" aria-label="Minuti" />
+          :
+          <input type="number" id="cut-sec" min="0" max="59" value="0" step="1" aria-label="Secondi" />
+          <small>(min : sec)</small>
+        </span>
+        <button type="button" id="cut-use-current" class="btn btn-secondary cut-use-current">⏱ Usa il punto attuale</button>
+      </div>
+      <p id="cut-hint" class="cut-hint"></p>
+      <div class="actions">
+        <button type="button" id="cut-cancel" class="btn btn-secondary">Annulla</button>
+        <button type="button" id="cut-confirm" class="btn btn-primary">✂️ Dividi</button>
+      </div>
+    </div>
+  </div>
+
   <script>
 "use strict";
 
@@ -396,7 +503,11 @@ const WORKER_URL = `${FFMPEG_BASE}/814.ffmpeg.js`;
 
 const VIDEO_EXT = /\.(mp4|mov|m4v|avi|mkv|webm|wmv|flv|mpe?g|3gp)$/i;
 
-let items = [];         // { file, thumb, duration } in merge order
+// Each item is a (possibly trimmed) slice of a source file:
+//   { file, thumb, duration, start, end, fileDur }
+// start/end are seconds within the file; end === null means "until the end".
+// duration is the slice's own length; fileDur the whole file's (when known).
+let items = [];
 let cover = null;       // optional cover image File shown at the start
 let ffmpeg = null;      // lazily created FFmpeg instance
 let logBuffer = [];     // captured ffmpeg log lines for the current command
@@ -404,6 +515,9 @@ let progressActive = false; // only track ffmpeg progress during the real merge
 let resultBlob = null;  // finished video waiting in the preview
 let resultUrl = null;   // object URL backing the preview player
 let dragIndex = null;   // index being dragged for list reordering
+let busy = false;       // an ffmpeg operation is running
+let cutIndex = null;    // index of the item open in the cut dialog
+let cutUrl = null;      // object URL backing the cut dialog player
 
 const fileInput = document.getElementById("file-input");
 const dropzone = document.getElementById("dropzone");
@@ -425,6 +539,15 @@ const previewVideo = document.getElementById("preview-video");
 const outNameInput = document.getElementById("out-name");
 const saveBtn = document.getElementById("save-btn");
 const discardBtn = document.getElementById("discard-btn");
+const cutModal = document.getElementById("cut-modal");
+const cutVideo = document.getElementById("cut-video");
+const cutFileNameEl = document.getElementById("cut-file-name");
+const cutMinInput = document.getElementById("cut-min");
+const cutSecInput = document.getElementById("cut-sec");
+const cutUseCurrentBtn = document.getElementById("cut-use-current");
+const cutHintEl = document.getElementById("cut-hint");
+const cutCancelBtn = document.getElementById("cut-cancel");
+const cutConfirmBtn = document.getElementById("cut-confirm");
 
 // --- Helpers ---------------------------------------------------------------
 
@@ -481,6 +604,28 @@ function sanitizeName(name) {
   return cleaned || "video-unito";
 }
 
+function isTrimmed(item) {
+  return item.start > 0 || item.end !== null;
+}
+
+// "0:00–1:30" (or "0:10–fine" when the slice runs to the end of the file).
+function rangeLabel(item) {
+  const from = formatDuration(item.start) || "0:00";
+  const to = item.end !== null ? formatDuration(item.end) : "fine";
+  return `${from}–${to}`;
+}
+
+function displayName(item) {
+  return item.file.name + (isTrimmed(item) ? ` ✂ ${rangeLabel(item)}` : "");
+}
+
+// Suggested filename for saving one slice, e.g. "vacanze 0.00-1.30".
+function suggestedPartName(item) {
+  const base = sanitizeName(item.file.name.replace(/\.[^.]+$/, ""));
+  if (!isTrimmed(item)) return base;
+  return `${base} ${rangeLabel(item).replace(/:/g, ".").replace(/–/g, "-")}`;
+}
+
 // --- File list management --------------------------------------------------
 
 function addFiles(fileListLike) {
@@ -490,7 +635,7 @@ function addFiles(fileListLike) {
     if (!isVideo(file)) { skipped++; continue; }
     const duplicate = items.some((it) => it.file.name === file.name && it.file.size === file.size);
     if (duplicate) continue;
-    const item = { file, thumb: null, duration: null };
+    const item = { file, thumb: null, duration: null, start: 0, end: null, fileDur: null };
     items.push(item);
     loadMeta(item);
   }
@@ -516,9 +661,15 @@ function loadMeta(item) {
     render();
   };
   video.addEventListener("loadedmetadata", () => {
-    if (isFinite(video.duration)) item.duration = video.duration;
+    if (isFinite(video.duration)) {
+      item.fileDur = video.duration;
+      const end = item.end !== null ? Math.min(item.end, video.duration) : video.duration;
+      item.duration = Math.max(end - item.start, 0);
+    }
     try {
-      video.currentTime = Math.min(1, (video.duration || 0) / 2);
+      // Grab the thumbnail frame from inside this item's own slice.
+      const sliceDur = item.duration || 0;
+      video.currentTime = item.start + Math.min(1, sliceDur / 2);
     } catch (_) { done(); }
   });
   video.addEventListener("seeked", () => {
@@ -552,7 +703,7 @@ function render() {
   items.forEach((item, i) => {
     const li = document.createElement("li");
     li.className = "file-item";
-    li.draggable = true;
+    li.draggable = !busy;
     li.innerHTML = `
       <span class="file-index">${i + 1}</span>
       ${item.thumb
@@ -562,17 +713,23 @@ function render() {
         <span class="file-name"></span>
         <span class="file-meta"></span>
       </span>
-      <button class="icon-btn" data-act="up" ${i === 0 ? "disabled" : ""} title="Sposta su">▲</button>
-      <button class="icon-btn" data-act="down" ${i === items.length - 1 ? "disabled" : ""} title="Sposta giù">▼</button>
-      <button class="icon-btn" data-act="remove" title="Rimuovi">✕</button>
+      <button class="icon-btn" data-act="up" ${i === 0 || busy ? "disabled" : ""} title="Sposta su">▲</button>
+      <button class="icon-btn" data-act="down" ${i === items.length - 1 || busy ? "disabled" : ""} title="Sposta giù">▼</button>
+      <button class="icon-btn" data-act="cut" ${busy ? "disabled" : ""} title="Dividi in due parti">✂️</button>
+      <button class="icon-btn" data-act="save" ${busy ? "disabled" : ""} title="Salva solo questa parte">💾</button>
+      <button class="icon-btn" data-act="remove" ${busy ? "disabled" : ""} title="Rimuovi">✕</button>
     `;
     const nameEl = li.querySelector(".file-name");
-    nameEl.textContent = item.file.name;
-    nameEl.title = item.file.name;
+    nameEl.textContent = displayName(item);
+    nameEl.title = displayName(item);
     const dur = formatDuration(item.duration);
-    li.querySelector(".file-meta").textContent = formatSize(item.file.size) + (dur ? ` · ${dur}` : "");
+    li.querySelector(".file-meta").textContent = isTrimmed(item)
+      ? (dur ? `parte · ${dur}` : "parte del video")
+      : formatSize(item.file.size) + (dur ? ` · ${dur}` : "");
     li.querySelector('[data-act="up"]').addEventListener("click", () => move(i, -1));
     li.querySelector('[data-act="down"]').addEventListener("click", () => move(i, 1));
+    li.querySelector('[data-act="cut"]').addEventListener("click", () => openCutModal(i));
+    li.querySelector('[data-act="save"]').addEventListener("click", () => savePart(i));
     li.querySelector('[data-act="remove"]').addEventListener("click", () => removeAt(i));
 
     // Drag & drop reordering (in addition to the arrows).
@@ -605,8 +762,20 @@ function render() {
   });
 
   updateSummary();
-  mergeBtn.disabled = items.length < 2;
-  clearBtn.disabled = items.length === 0;
+  mergeBtn.disabled = busy || items.length < 2;
+  clearBtn.disabled = busy || items.length === 0;
+}
+
+// Bytes of the distinct source files (slices of one file count it once).
+function uniqueBytes() {
+  const seen = new Set();
+  let total = 0;
+  for (const it of items) {
+    if (seen.has(it.file)) continue;
+    seen.add(it.file);
+    total += it.file.size;
+  }
+  return total;
 }
 
 function updateSummary() {
@@ -615,10 +784,9 @@ function updateSummary() {
     summaryEl.textContent = "";
     return;
   }
-  const totalBytes = items.reduce((s, it) => s + it.file.size, 0);
   const known = items.filter((it) => isFinite(it.duration) && it.duration > 0);
   const totalDur = known.reduce((s, it) => s + it.duration, 0);
-  let text = `${items.length} video · ${formatSize(totalBytes)}`;
+  let text = `${items.length} video · ${formatSize(uniqueBytes())}`;
   if (known.length > 0) {
     text += ` · ${formatDuration(totalDur)}${known.length < items.length ? "+" : ""} totali`;
   }
@@ -685,6 +853,106 @@ function coverDuration() {
   if (!isFinite(d) || d <= 0) d = 3;
   return Math.max(1, Math.min(60, d));
 }
+
+// --- Cut dialog: split one item into two slices ------------------------------
+
+function setCutHint(message, isError) {
+  cutHintEl.textContent = message || "";
+  cutHintEl.className = "cut-hint" + (isError ? " error" : "");
+}
+
+function openCutModal(index) {
+  if (busy) return;
+  const item = items[index];
+  cutIndex = index;
+  cutUrl = URL.createObjectURL(item.file);
+  cutVideo.src = cutUrl;
+  cutFileNameEl.textContent = displayName(item);
+  cutMinInput.value = "0";
+  cutSecInput.value = "0";
+  const sliceDur = formatDuration(item.duration);
+  setCutHint(sliceDur
+    ? `Indica il punto del taglio, tra 0:00 e ${sliceDur}. Puoi anche mettere in pausa il video nel punto giusto e premere "Usa il punto attuale".`
+    : 'Indica il punto del taglio (minuti : secondi), oppure metti in pausa il video nel punto giusto e premi "Usa il punto attuale".');
+  cutModal.hidden = false;
+}
+
+function closeCutModal() {
+  try { cutVideo.pause(); } catch (_) {}
+  cutVideo.removeAttribute("src");
+  try { cutVideo.load(); } catch (_) {}
+  if (cutUrl) URL.revokeObjectURL(cutUrl);
+  cutUrl = null;
+  cutIndex = null;
+  cutModal.hidden = true;
+}
+
+// The player shows the whole source file; keep playback inside the slice.
+cutVideo.addEventListener("loadedmetadata", () => {
+  if (cutIndex === null) return;
+  const item = items[cutIndex];
+  if (item && item.start > 0) {
+    try { cutVideo.currentTime = item.start; } catch (_) {}
+  }
+});
+
+cutVideo.addEventListener("timeupdate", () => {
+  if (cutIndex === null) return;
+  const item = items[cutIndex];
+  if (!item) return;
+  if (item.end !== null && cutVideo.currentTime > item.end) {
+    cutVideo.pause();
+    try { cutVideo.currentTime = item.end; } catch (_) {}
+  } else if (cutVideo.currentTime < item.start - 0.25) {
+    try { cutVideo.currentTime = item.start; } catch (_) {}
+  }
+});
+
+cutUseCurrentBtn.addEventListener("click", () => {
+  if (cutIndex === null) return;
+  const item = items[cutIndex];
+  const rel = Math.max(0, cutVideo.currentTime - item.start);
+  cutMinInput.value = String(Math.floor(rel / 60));
+  cutSecInput.value = String(Math.floor(rel % 60));
+  setCutHint("");
+});
+
+cutCancelBtn.addEventListener("click", closeCutModal);
+cutModal.addEventListener("click", (e) => { if (e.target === cutModal) closeCutModal(); });
+
+cutConfirmBtn.addEventListener("click", () => {
+  if (cutIndex === null) return;
+  const item = items[cutIndex];
+  const m = parseInt(cutMinInput.value, 10) || 0;
+  const s = parseFloat(cutSecInput.value) || 0;
+  const rel = m * 60 + s; // cut point, relative to this slice's start
+
+  if (rel <= 0) {
+    setCutHint("Indica un punto di taglio maggiore di 0:00.", true);
+    return;
+  }
+  if (isFinite(item.duration) && item.duration > 0 && rel >= item.duration) {
+    setCutHint(`Il taglio deve cadere prima della fine (${formatDuration(item.duration)}).`, true);
+    return;
+  }
+
+  const cutAbs = item.start + rel;
+  const first = {
+    file: item.file, thumb: null, start: item.start, end: cutAbs,
+    duration: rel, fileDur: item.fileDur,
+  };
+  const second = {
+    file: item.file, thumb: null, start: cutAbs, end: item.end,
+    duration: isFinite(item.duration) && item.duration > 0 ? item.duration - rel : null,
+    fileDur: item.fileDur,
+  };
+  items.splice(cutIndex, 1, first, second);
+  closeCutModal();
+  render();
+  loadMeta(first);
+  loadMeta(second);
+  setStatus(`✂️ Video diviso in due parti a ${formatDuration(cutAbs)}.`, "success");
+});
 
 // --- FFmpeg (loaded lazily on first use) -----------------------------------
 
@@ -765,11 +1033,14 @@ async function tryFastConcat(infos, names, out) {
 }
 
 // Robust: normalise every clip to a common canvas and re-encode.
+// `segs` = [{ name, width, height, fps, hasAudio, duration, start, trimmed }]:
+// one entry per (possibly trimmed) slice, in output order. Slices of the same
+// source file reuse the same `name` (each gets its own ffmpeg input).
 // `cover` (optional) = { name, duration }: a still image shown at the start.
-async function reencodeConcat(infos, names, out, cover) {
-  const canvasW = even(Math.max(...infos.map((i) => i.width)));
-  const canvasH = even(Math.max(...infos.map((i) => i.height)));
-  const fps = Math.round(Math.max(...infos.map((i) => i.fps))) || 30;
+async function reencodeConcat(segs, out, cover) {
+  const canvasW = even(Math.max(...segs.map((s) => s.width)));
+  const canvasH = even(Math.max(...segs.map((s) => s.height)));
+  const fps = Math.round(Math.max(...segs.map((s) => s.fps))) || 30;
 
   const args = ["-y"];
   // Build the ordered list of segments (cover first, if any), each tracking
@@ -782,9 +1053,11 @@ async function reencodeConcat(infos, names, out, cover) {
     args.push("-loop", "1", "-t", cover.duration.toFixed(3), "-i", cover.name);
     segments.push({ vIndex: inputIndex++, hasAudio: false, duration: cover.duration });
   }
-  names.forEach((n, k) => {
-    args.push("-i", n);
-    segments.push({ vIndex: inputIndex++, hasAudio: infos[k].hasAudio, duration: infos[k].duration });
+  segs.forEach((seg) => {
+    // Input-side seeking: fast, and frame-accurate when re-encoding.
+    if (seg.trimmed) args.push("-ss", seg.start.toFixed(3), "-t", seg.duration.toFixed(3));
+    args.push("-i", seg.name);
+    segments.push({ vIndex: inputIndex++, hasAudio: seg.hasAudio, duration: seg.duration });
   });
 
   // Add a finite silent-audio input for every segment without audio.
@@ -829,11 +1102,12 @@ async function reencodeConcat(infos, names, out, cover) {
 
 // --- Result preview + save ---------------------------------------------------
 
-function showPreview(blob) {
+function showPreview(blob, suggestedName) {
   clearPreview();
   resultBlob = blob;
   resultUrl = URL.createObjectURL(blob);
   previewVideo.src = resultUrl;
+  outNameInput.value = suggestedName || "video-unito";
   previewEl.hidden = false;
 }
 
@@ -887,6 +1161,65 @@ saveBtn.addEventListener("click", async () => {
 
 discardBtn.addEventListener("click", () => { clearPreview(); setStatus(""); });
 
+// --- Save a single slice as its own file -------------------------------------
+
+async function savePart(index) {
+  if (busy) return;
+  const item = items[index];
+  if (item.file.size > 700 * 1024 * 1024) {
+    setStatus("File troppo grande per l'elaborazione nel browser (max ~700 MB).", "error");
+    return;
+  }
+
+  clearPreview();
+  busy = true;
+  render();
+  const name = `part.${extOf(item.file.name)}`;
+
+  try {
+    await ensureFFmpeg();
+
+    setStatus("Caricamento del file…", "busy");
+    setProgress(0);
+    await ffmpeg.writeFile(name, await fetchFile(item.file));
+
+    setStatus("Analisi del video…", "busy");
+    const info = await probe(name);
+    const start = Math.max(0, item.start || 0);
+    const fileEnd = info.duration || item.fileDur || 0;
+    const end = item.end !== null ? (fileEnd ? Math.min(item.end, fileEnd) : item.end) : fileEnd;
+    const dur = Math.max(end - start, 0.05);
+
+    setStatus("Preparazione della parte…", "busy");
+    progressActive = true;
+    const args = ["-y"];
+    // Input-side seeking: fast, and frame-accurate when re-encoding.
+    if (isTrimmed(item)) args.push("-ss", start.toFixed(3), "-t", dur.toFixed(3));
+    args.push("-i", name, "-c:v", "libx264", "-preset", "veryfast", "-crf", "23");
+    if (info.hasAudio) args.push("-c:a", "aac", "-b:a", "192k");
+    args.push("-movflags", "+faststart", "out.mp4");
+    await ffmpeg.exec(args);
+    progressActive = false;
+    if (!(await fileExists("out.mp4"))) throw new Error("estrazione non riuscita.");
+
+    const data = await ffmpeg.readFile("out.mp4");
+    const blob = new Blob([data.buffer], { type: "video/mp4" });
+    setProgress(null);
+    showPreview(blob, suggestedPartName(item));
+    setStatus(`✓ Parte pronta (${formatSize(blob.size)}): guarda l'anteprima e salva.`, "success");
+
+    await cleanupFS([name], ["out.mp4"]);
+  } catch (err) {
+    progressActive = false;
+    console.error(err);
+    setProgress(null);
+    setStatus("Errore durante l'estrazione: " + (err && err.message ? err.message : "riprova."), "error");
+  } finally {
+    busy = false;
+    render();
+  }
+}
+
 // --- Merge orchestration ---------------------------------------------------
 
 async function cleanupFS(names, extra) {
@@ -896,18 +1229,23 @@ async function cleanupFS(names, extra) {
 }
 
 mergeBtn.addEventListener("click", async () => {
+  if (busy) return;
   if (items.length < 2) { setStatus("Seleziona almeno 2 file video.", "error"); return; }
 
-  const totalBytes = items.reduce((s, it) => s + it.file.size, 0);
-  if (totalBytes > 700 * 1024 * 1024) {
+  if (uniqueBytes() > 700 * 1024 * 1024) {
     setStatus("File troppo grandi per l'elaborazione nel browser (max ~700 MB in totale).", "error");
     return;
   }
 
   clearPreview();
-  mergeBtn.disabled = true;
-  clearBtn.disabled = true;
-  const names = items.map((it, i) => `in${i}.${extOf(it.file.name)}`);
+  busy = true;
+  render();
+
+  // Slices of the same source file share one copy in ffmpeg's filesystem.
+  const fileNames = new Map();
+  items.forEach((it) => {
+    if (!fileNames.has(it.file)) fileNames.set(it.file, `in${fileNames.size}.${extOf(it.file.name)}`);
+  });
   let coverName = null;
 
   try {
@@ -915,8 +1253,8 @@ mergeBtn.addEventListener("click", async () => {
 
     setStatus("Caricamento dei file…", "busy");
     setProgress(0);
-    for (let i = 0; i < items.length; i++) {
-      await ffmpeg.writeFile(names[i], await fetchFile(items[i].file));
+    for (const [file, name] of fileNames) {
+      await ffmpeg.writeFile(name, await fetchFile(file));
     }
     if (cover) {
       coverName = `cover.${extOf(cover.name)}`;
@@ -924,17 +1262,39 @@ mergeBtn.addEventListener("click", async () => {
     }
 
     setStatus("Analisi dei video…", "busy");
-    const infos = [];
-    for (const n of names) infos.push(await probe(n));
+    const fileInfos = new Map();
+    for (const [file, name] of fileNames) {
+      fileInfos.set(file, await probe(name));
+    }
+
+    // One segment per item, resolving trim bounds against the probed duration.
+    const segs = items.map((it) => {
+      const info = fileInfos.get(it.file);
+      const start = Math.max(0, it.start || 0);
+      const fileEnd = info.duration || it.fileDur || 0;
+      const end = it.end !== null ? (fileEnd ? Math.min(it.end, fileEnd) : it.end) : fileEnd;
+      return {
+        name: fileNames.get(it.file),
+        width: info.width, height: info.height, fps: info.fps,
+        hasAudio: info.hasAudio,
+        duration: Math.max(end - start, 0.05),
+        start,
+        trimmed: isTrimmed(it),
+      };
+    });
+    const anyTrim = segs.some((s) => s.trimmed);
 
     setStatus("Unione in corso… può richiedere qualche minuto.", "busy");
     progressActive = true;
-    if (coverName) {
-      // With a cover we always re-encode (the image must be turned into video).
-      await reencodeConcat(infos, names, "out.mp4", { name: coverName, duration: coverDuration() });
+    if (coverName || anyTrim) {
+      // Covers and cuts always need the re-encode path.
+      await reencodeConcat(segs, "out.mp4",
+        coverName ? { name: coverName, duration: coverDuration() } : null);
     } else {
+      const infos = items.map((it) => fileInfos.get(it.file));
+      const names = items.map((it) => fileNames.get(it.file));
       const fast = await tryFastConcat(infos, names, "out.mp4");
-      if (!fast) await reencodeConcat(infos, names, "out.mp4", null);
+      if (!fast) await reencodeConcat(segs, "out.mp4", null);
     }
     progressActive = false;
 
@@ -942,16 +1302,17 @@ mergeBtn.addEventListener("click", async () => {
     const blob = new Blob([data.buffer], { type: "video/mp4" });
 
     setProgress(null);
-    showPreview(blob);
+    showPreview(blob, "video-unito");
     setStatus(`✓ Video pronto (${formatSize(blob.size)}): guarda l'anteprima e salva.`, "success");
 
-    await cleanupFS(names, ["out.mp4", "list.txt", coverName].filter(Boolean));
+    await cleanupFS([...fileNames.values()], ["out.mp4", "list.txt", coverName].filter(Boolean));
   } catch (err) {
     progressActive = false;
     console.error(err);
     setProgress(null);
     setStatus("Errore durante l'unione: " + (err && err.message ? err.message : "riprova con video più piccoli."), "error");
   } finally {
+    busy = false;
     render();
   }
 });
