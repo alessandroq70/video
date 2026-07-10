@@ -1,4 +1,4 @@
-# 🎬 Unisci Video
+# 🎬 Video Studio
 
 App web per **unire due o più file video** in un unico MP4 — e per **dividere
 un video** nel punto che scegli — **direttamente nel browser**. Nessuna
